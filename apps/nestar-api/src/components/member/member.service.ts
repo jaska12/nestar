@@ -19,7 +19,8 @@ export class MemberService {
         input.memberPassword = await this.authService.hashPassword(input.memberPassword);
         try {
             const result = await this.memberModel.create(input);
-            // TODO: Authentication via TOKEN
+            // Authentication via TOKEN
+            result.accessToken = await this.authService.createToken(result as unknown as Member);
             return result as unknown as Member;
         } catch (err) {
             console.log('Error, Service.model:', err.message);
@@ -42,6 +43,8 @@ export class MemberService {
 
         const isMatch = await this.authService.comparePasswords(input.memberPassword, response.memberPassword as string);
         if (!isMatch) throw new InternalServerErrorException(Message.WRONG_PASSWORD);
+
+        response.accessToken = await this.authService.createToken(response);
 
         return response;
     }
