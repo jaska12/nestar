@@ -1,17 +1,23 @@
 import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Member } from '../../libs/dto/member/member';
 import { LoginInput, MemberInput } from '../../libs/dto/member/member.input';
 import { MemberStatus } from '../../libs/enums/member.enum';
 import { Message } from '../../libs/enums/common.enum';
 import { AuthService } from '../auth/auth.service';
+import { MemberUpdate } from '../../libs/dto/member/member.update';
+import { ViewService } from '../view/view.service';
+import { ViewInput } from '../../libs/dto/view/view.input';
+import { ViewGroup } from '../../libs/enums/view.enum';
+import { StatisticModifier, T } from '../../libs/types/common';
 
 @Injectable()
 export class MemberService {
     constructor(
         @InjectModel('Member') private readonly memberModel: Model<Member>,
         private authService: AuthService,
+        private viewService: ViewService,
     ) { }
 
     public async signup(input: MemberInput): Promise<Member> {
@@ -49,12 +55,54 @@ export class MemberService {
         return response;
     }
 
-    public async updateMember(): Promise<string> {
-        return 'updateMember executed!';
+    public async updateMember(memberId: Types.ObjectId, input: MemberUpdate): Promise<Member> {
+        if (input.memberPassword) {
+            input.memberPassword = await this.authService.hashPassword(input.memberPassword);
+        }
+        const result: Member = await this.memberModel
+            .findOneAndUpdate(
+                {
+                    _id: memberId,
+                    memberStatus: MemberStatus.ACTIVE,
+                },
+                input,
+                { new: true },
+            )
+            .exec() as unknown as Member;
+        if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+        result.accessToken = await this.authService.createToken(result);
+        return result;
     }
 
-    public async getMember(): Promise<string> {
-        return 'getMember executed!';
+    public async getMember(memberId: Types.ObjectId, targetId: Types.ObjectId): Promise<Member> {
+        const search: T = {
+            _id: targetId,
+            memberStatus: MemberStatus.ACTIVE,
+        };
+        const targetMember: Member = await this.memberModel.findOne(search).exec() as unknown as Member;
+        if (!targetMember) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+
+        if (memberId) {
+            const viewInput: ViewInput = {
+                memberId: memberId,
+                viewRefId: targetId,
+                viewGroup: ViewGroup.MEMBER,
+            };
+            const newView = await this.viewService.recordView(viewInput);
+            if (newView) {
+                await this.statisticModifier({ _id: targetId, targetKey: 'memberViews', modifier: 1 });
+                targetMember.memberViews++;
+            }
+        }
+
+        return targetMember;
+    }
+
+    public async statisticModifier(input: StatisticModifier): Promise<Member> {
+        const { _id, targetKey, modifier } = input;
+        return await this.memberModel
+            .findByIdAndUpdate(_id, { $inc: { [targetKey]: modifier } }, { new: true })
+            .exec() as unknown as Member;
     }
 
     public async getAllMembersByAdmin(): Promise<string> {
