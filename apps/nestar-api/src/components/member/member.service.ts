@@ -81,18 +81,14 @@ export class MemberService {
                 $in: [MemberStatus.ACTIVE, MemberStatus.BLOCK],
             },
         };
-        const targetMember: Member = await this.memberModel.findOne(search).exec() as unknown as Member;
+        const targetMember: Member = await this.memberModel.findOne(search).lean().exec() as unknown as Member;
         if (!targetMember) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 
         if (memberId) {
-            const viewInput: ViewInput = {
-                memberId: memberId,
-                viewRefId: targetId,
-                viewGroup: ViewGroup.MEMBER,
-            };
+            const viewInput: ViewInput = { memberId: memberId, viewRefId: targetId, viewGroup: ViewGroup.MEMBER };
             const newView = await this.viewService.recordView(viewInput);
             if (newView) {
-                await this.statisticModifier({ _id: targetId, targetKey: 'memberViews', modifier: 1 });
+                await this.memberModel.findOneAndUpdate(search, { $inc: { memberViews: 1 } }, { new: true }).exec();
                 targetMember.memberViews++;
             }
         }

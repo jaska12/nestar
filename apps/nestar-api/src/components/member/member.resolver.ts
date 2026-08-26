@@ -63,6 +63,7 @@ export class MemberResolver {
         @AuthMember('_id') memberId: Types.ObjectId,
     ): Promise<Member> {
         console.log('Query: getMember');
+        console.log('memberId:', memberId);
         const targetId = shapeIntoMongoObjectId(input);
         return this.memberService.getMember(memberId, targetId);
     }
