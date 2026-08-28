@@ -11,7 +11,10 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { MemberType } from '../../libs/enums/member.enum';
 import { MemberUpdate } from '../../libs/dto/member/member.update';
 import { WithoutGuard } from '../auth/guards/without.guard';
-import { shapeIntoMongoObjectId } from '../../libs/config';
+import { getSerialForImage, shapeIntoMongoObjectId, validMimeTypes } from '../../libs/config';
+import { GraphQLUpload, FileUpload } from 'graphql-upload';
+import { createWriteStream } from 'fs';
+import { Message } from '../../libs/enums/common.enum';
 
 @Resolver()
 export class MemberResolver {
@@ -78,6 +81,75 @@ export class MemberResolver {
         return this.memberService.getAgents(memberId, input);
     }
 
+    /** UPLOADER **/
+
+    @UseGuards(AuthGuard)
+    @Mutation((returns) => String)
+    public async imageUploader(
+        @Args({ name: 'file', type: () => GraphQLUpload })
+        { createReadStream, filename, mimetype }: FileUpload,
+        @Args('target') target: String,
+    ): Promise<string> {
+        console.log('Mutation: imageUploader');
+
+        if (!filename) throw new Error(Message.UPLOAD_FAILED);
+        const validMime = validMimeTypes.includes(mimetype);
+        if (!validMime) throw new Error(Message.PROVIDE_ALLOWED_FORMAT);
+
+        const imageName = getSerialForImage(filename);
+        const url = `uploads/${target}/${imageName}`;
+        const stream = createReadStream();
+
+        const result = await new Promise((resolve, reject) => {
+            stream
+                .pipe(createWriteStream(url))
+                .on('finish', async () => resolve(true))
+                .on('error', () => reject(false));
+        });
+        if (!result) throw new Error(Message.UPLOAD_FAILED);
+
+        return url;
+    }
+
+    @UseGuards(AuthGuard)
+    @Mutation((returns) => [String])
+    public async imagesUploader(
+        @Args('files', { type: () => [GraphQLUpload] })
+        files: Promise<FileUpload>[],
+        @Args('target') target: String,
+    ): Promise<string[]> {
+        console.log('Mutation: imagesUploader');
+
+        const uploadedImages: string[] = [];
+        const promisedList = files.map(async (img: Promise<FileUpload>, index: number) => {
+            try {
+                const { filename, mimetype, encoding, createReadStream } = await img;
+
+                const validMime = validMimeTypes.includes(mimetype);
+                if (!validMime) throw new Error(Message.PROVIDE_ALLOWED_FORMAT);
+
+                const imageName = getSerialForImage(filename);
+                const url = `uploads/${target}/${imageName}`;
+                const stream = createReadStream();
+
+                const result = await new Promise((resolve, reject) => {
+                    stream
+                        .pipe(createWriteStream(url))
+                        .on('finish', () => resolve(true))
+                        .on('error', () => reject(false));
+                });
+                if (!result) throw new Error(Message.UPLOAD_FAILED);
+
+                uploadedImages[index] = url;
+            } catch (err) {
+                console.log('Error, file missing!');
+            }
+        });
+
+        await Promise.all(promisedList);
+        return uploadedImages;
+    }
+
     /** ADMIN **/
 
     @Roles(MemberType.ADMIN)
@@ -96,3 +168,4 @@ export class MemberResolver {
         return await this.memberService.updateMemberByAdmin(input);
     }
 }
+
