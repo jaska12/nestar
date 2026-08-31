@@ -174,7 +174,7 @@ export class PropertyService {
             memberId: memberId,
             propertyStatus: propertyStatus ?? { $ne: PropertyStatus.DELETE },
         };
-        const sort: T = { [input.sort ?? 'createdAt']: input.direction ?? Direction.DESC };
+        const sort: T = { [input.sort ?? 'createdAt']: input?.direction ?? Direction.DESC };
 
         const result = await this.propertyModel
             .aggregate([
