@@ -1,7 +1,7 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
 import { IsIn, IsNotEmpty, IsOptional, Length, IsInt, Min } from 'class-validator';
 import { PropertyLocation, PropertyStatus, PropertyType } from '../../enums/property.enum';
-import { availablePropertySorts } from '../../config';
+import { availableOptions, availablePropertySorts } from '../../config';
 import { Direction } from '../../enums/common.enum';
 import { ObjectId } from 'bson';
 
@@ -133,6 +133,11 @@ export class PISearch {
     @IsOptional()
     @Field(() => String, { nullable: true })
     text?: string;
+
+    @IsOptional()
+    @IsIn(availableOptions, { each: true })
+    @Field(() => [String], { nullable: true })
+    options?: string[];
 }
 
 @InputType()

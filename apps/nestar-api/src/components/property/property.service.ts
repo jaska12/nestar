@@ -9,7 +9,7 @@ import { PropertyUpdate } from '../../libs/dto/property/property.update';
 import { PropertyStatus } from '../../libs/enums/property.enum';
 import { ViewGroup } from '../../libs/enums/view.enum';
 import { StatisticModifier, T } from '../../libs/types/common';
-import { shapeIntoMongoObjectId } from '../../libs/config';
+import { lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
 import { MemberService } from '../member/member.service';
 import { ViewService } from '../view/view.service';
 import moment from 'moment';
@@ -105,7 +105,12 @@ export class PropertyService {
     }
 
     public async getProperties(memberId: ObjectId, input: PropertiesInquiry): Promise<Properties> {
-        const { match, sort } = this.shapeMatchQuery(input);
+        const match: T = { propertyStatus: PropertyStatus.ACTIVE };
+        const sort: T = { [input.sort ?? 'createdAt']: input?.direction ?? Direction.DESC };
+
+        this.shapeMatchQuery(match, input);
+        console.log('match:', match);
+
         const result = await this.propertyModel
             .aggregate([
                 { $match: match },
@@ -115,15 +120,9 @@ export class PropertyService {
                         list: [
                             { $skip: (input.page - 1) * input.limit },
                             { $limit: input.limit },
-                            {
-                                $lookup: {
-                                    from: 'members',
-                                    localField: 'memberId',
-                                    foreignField: '_id',
-                                    as: 'memberData',
-                                },
-                            },
-                            { $unwind: { path: '$memberData', preserveNullAndEmptyArrays: true } },
+                            // meLiked
+                            lookupMember,
+                            { $unwind: '$memberData' },
                         ],
                         metaCounter: [{ $count: 'total' }],
                     },
@@ -136,23 +135,35 @@ export class PropertyService {
         return result[0];
     }
 
-    private shapeMatchQuery(input: PropertiesInquiry): { match: T; sort: T } {
-        const { memberId, locationList, typeList, roomsList, bedsList, pricesRange, periodsRange, squaresRange, text } =
-            input.search;
-        const match: T = { propertyStatus: PropertyStatus.ACTIVE };
-        const sort: T = { [input.sort ?? 'createdAt']: input.direction ?? Direction.DESC };
-
+    private shapeMatchQuery(match: T, input: PropertiesInquiry): void {
+        const {
+            memberId,
+            locationList,
+            roomsList,
+            bedsList,
+            typeList,
+            periodsRange,
+            pricesRange,
+            squaresRange,
+            options,
+            text,
+        } = input.search;
         if (memberId) match.memberId = shapeIntoMongoObjectId(memberId);
-        if (locationList && locationList.length) match.propertyLocation = { $in: locationList };
-        if (typeList && typeList.length) match.propertyType = { $in: typeList };
-        if (roomsList && roomsList.length) match.propertyRooms = { $in: roomsList };
-        if (bedsList && bedsList.length) match.propertyBeds = { $in: bedsList };
-        if (pricesRange) match.propertyPrice = { $gte: pricesRange.start, $lte: pricesRange.end };
-        if (squaresRange) match.propertySquare = { $gte: squaresRange.start, $lte: squaresRange.end };
-        if (periodsRange) match.createdAt = { $gte: periodsRange.start, $lte: periodsRange.end };
-        if (text) match.propertyTitle = { $regex: new RegExp(text, 'i') };
+        if (locationList) match.propertyLocation = { $in: locationList };
+        if (roomsList) match.propertyRooms = { $in: roomsList };
+        if (bedsList) match.propertyBeds = { $in: bedsList };
+        if (typeList) match.propertyType = { $in: typeList };
 
-        return { match, sort };
+        if (pricesRange) match.propertyPrice = { $gte: pricesRange.start, $lte: pricesRange.end };
+        if (periodsRange) match.createdAt = { $gte: periodsRange.start, $lte: periodsRange.end };
+        if (squaresRange) match.propertySquare = { $gte: squaresRange.start, $lte: squaresRange.end };
+
+        if (text) match.propertyTitle = { $regex: new RegExp(text, 'i') };
+        if (options) {
+            match['$or'] = options.map((ele) => {
+                return { [ele]: true };
+            });
+        }
     }
 
     public async getAgentProperties(memberId: ObjectId, input: AgentPropertiesInquiry): Promise<Properties> {
@@ -174,15 +185,8 @@ export class PropertyService {
                         list: [
                             { $skip: (input.page - 1) * input.limit },
                             { $limit: input.limit },
-                            {
-                                $lookup: {
-                                    from: 'members',
-                                    localField: 'memberId',
-                                    foreignField: '_id',
-                                    as: 'memberData',
-                                },
-                            },
-                            { $unwind: { path: '$memberData', preserveNullAndEmptyArrays: true } },
+                            lookupMember,
+                            { $unwind: '$memberData' },
                         ],
                         metaCounter: [{ $count: 'total' }],
                     },
