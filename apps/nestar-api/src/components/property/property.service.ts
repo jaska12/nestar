@@ -12,6 +12,7 @@ import { StatisticModifier, T } from '../../libs/types/common';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { MemberService } from '../member/member.service';
 import { ViewService } from '../view/view.service';
+import moment from 'moment';
 
 @Injectable()
 export class PropertyService {
@@ -81,8 +82,8 @@ export class PropertyService {
             propertyStatus: PropertyStatus.ACTIVE,
         };
 
-        if (propertyStatus === PropertyStatus.SOLD) input.soldAt = new Date();
-        if (propertyStatus === PropertyStatus.DELETE) input.deletedAt = new Date();
+        if (propertyStatus === PropertyStatus.SOLD) input.soldAt = moment().toDate();
+        else if (propertyStatus === PropertyStatus.DELETE) input.deletedAt = moment().toDate();
 
         const result = (await this.propertyModel
             .findOneAndUpdate(search, input, {
