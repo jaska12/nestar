@@ -2,6 +2,14 @@ import { ObjectId } from 'bson';
 
 export const availableAgentSorts = ['createdAt', 'updatedAt', 'memberLikes', 'memberViews', 'memberRank'];
 export const availableMemberSorts = ['createdAt', 'updatedAt', 'memberLikes', 'memberViews', 'memberRank'];
+export const availablePropertySorts = [
+    'createdAt',
+    'updatedAt',
+    'propertyViews',
+    'propertyLikes',
+    'propertyPrice',
+    'propertyRank',
+];
 
 /** IMAGE CONFIGURATION **/
 import { v4 as uuidv4 } from 'uuid';
