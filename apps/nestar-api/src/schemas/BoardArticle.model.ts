@@ -29,12 +29,12 @@ const BoardArticleSchema = new Schema(
             type: String,
         },
 
-        articleLikes: {
+        articleViews: {
             type: Number,
             default: 0,
         },
 
-        articleViews: {
+        articleLikes: {
             type: Number,
             default: 0,
         },
@@ -49,12 +49,8 @@ const BoardArticleSchema = new Schema(
             required: true,
             ref: 'Member',
         },
-
-        deletedAt: {
-            type: Date,
-        },
     },
-    { timestamps: true, collection: 'boardArticles' },
+    { timestamps: true, collection: 'board-articles' },
 );
 
 export default BoardArticleSchema;
