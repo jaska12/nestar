@@ -7,9 +7,11 @@ import { AllBoardArticlesInquiry, BoardArticleInput, BoardArticlesInquiry } from
 import { BoardArticleUpdate } from '../../libs/dto/board-article/board-article.update';
 import { BoardArticleStatus } from '../../libs/enums/board-article.enum';
 import { Direction, Message } from '../../libs/enums/common.enum';
-import { T } from '../../libs/types/common';
+import { StatisticModifier, T } from '../../libs/types/common';
 import { lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
 import { MemberService } from '../member/member.service';
+import { ViewService } from '../view/view.service';
+import { ViewGroup } from '../../libs/enums/view.enum';
 import moment from 'moment';
 
 @Injectable()
@@ -17,6 +19,7 @@ export class BoardArticleService {
     constructor(
         @InjectModel('BoardArticle') private readonly boardArticleModel: Model<BoardArticle>,
         private memberService: MemberService,
+        private viewService: ViewService,
     ) { }
 
     public async createBoardArticle(input: BoardArticleInput): Promise<BoardArticle> {
@@ -43,8 +46,30 @@ export class BoardArticleService {
         const targetArticle: BoardArticle = (await this.boardArticleModel.findOne(search).lean().exec()) as BoardArticle;
         if (!targetArticle) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 
+        if (memberId) {
+            const viewInput = { memberId: memberId, viewRefId: articleId, viewGroup: ViewGroup.ARTICLE };
+            const newView = await this.viewService.recordView(viewInput);
+            if (newView) {
+                await this.boardArticleStatsEditor({ _id: shapeIntoMongoObjectId(articleId), targetKey: 'articleViews', modifier: 1 });
+                targetArticle.articleViews++;
+            }
+
+            // meLiked
+        }
+
         targetArticle.memberData = await this.memberService.getMember(null, shapeIntoMongoObjectId(targetArticle.memberId));
         return targetArticle;
+    }
+
+    public async boardArticleStatsEditor(input: StatisticModifier): Promise<BoardArticle> {
+        const { _id, targetKey, modifier } = input;
+        return await this.boardArticleModel
+            .findOneAndUpdate(
+                { _id },
+                { $inc: { [targetKey]: modifier } },
+                { new: true },
+            )
+            .exec();
     }
 
     public async updateBoardArticle(memberId: ObjectId, input: BoardArticleUpdate): Promise<BoardArticle> {
@@ -83,6 +108,7 @@ export class BoardArticleService {
         if (articleCategory) match.articleCategory = articleCategory;
         if (searchMemberId) match.memberId = shapeIntoMongoObjectId(searchMemberId);
         if (text) match.articleTitle = { $regex: new RegExp(text, 'i') };
+        console.log('match:', match);
 
         const result = await this.boardArticleModel
             .aggregate([
@@ -93,6 +119,7 @@ export class BoardArticleService {
                         list: [
                             { $skip: (input.page - 1) * input.limit },
                             { $limit: input.limit },
+                            // meLiked
                             lookupMember,
                             { $unwind: '$memberData' },
                         ],
