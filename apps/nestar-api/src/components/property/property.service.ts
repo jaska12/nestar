@@ -12,6 +12,9 @@ import { StatisticModifier, T } from '../../libs/types/common';
 import { lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
 import { MemberService } from '../member/member.service';
 import { ViewService } from '../view/view.service';
+import { LikeService } from '../like/like.service';
+import { LikeInput } from '../../libs/dto/like/like.input';
+import { LikeGroup } from '../../libs/enums/like.enum';
 import moment from 'moment';
 
 @Injectable()
@@ -20,6 +23,7 @@ export class PropertyService {
         @InjectModel('Property') private readonly propertyModel: Model<Property>,
         private memberService: MemberService,
         private viewService: ViewService,
+        private likeService: LikeService,
     ) { }
 
     public async createProperty(input: PropertyInput): Promise<Property> {
