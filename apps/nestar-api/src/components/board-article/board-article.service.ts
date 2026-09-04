@@ -59,6 +59,8 @@ export class BoardArticleService {
             }
 
             // meLiked
+            const likeInput = { memberId: memberId, likeRefId: articleId, likeGroup: LikeGroup.ARTICLE };
+            targetArticle.meLiked = await this.likeService.checkLikeExistence(likeInput);
         }
 
         targetArticle.memberData = await this.memberService.getMember(null, shapeIntoMongoObjectId(targetArticle.memberId));
