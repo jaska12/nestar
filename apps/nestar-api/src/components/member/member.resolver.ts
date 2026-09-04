@@ -5,7 +5,7 @@ import { Member, Members } from '../../libs/dto/member/member';
 import { UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { AuthMember } from '../auth/decorators/authMember.decorator';
-import { Types } from 'mongoose';
+import { ObjectId, Types } from 'mongoose';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { MemberType } from '../../libs/enums/member.enum';
@@ -79,6 +79,17 @@ export class MemberResolver {
     ): Promise<Members> {
         console.log('Query: getAgents');
         return this.memberService.getAgents(memberId, input);
+    }
+
+    @UseGuards(AuthGuard)
+    @Mutation(() => Member)
+    public async likeTargetMember(
+        @Args('memberId') input: string,
+        @AuthMember('_id') memberId: ObjectId,
+    ): Promise<Member> {
+        console.log('Mutation: likeTargetMember');
+        const likeRefId = shapeIntoMongoObjectId(input);
+        return await this.memberService.likeTargetMember(memberId, likeRefId);
     }
 
     /** UPLOADER **/
